@@ -83,8 +83,10 @@ def getPicsInfo(url, dire):
         # 根据List中的图片连接下载图片
         for j in range(len(pics_info)):
             img_src = pics_info[j]['src']
-            download_pics(img_src, j + 1, dire, title)
+            isDownloaded = download_pics(img_src, j + 1, dire, title)
             print('{0}下载进度{1:.2%}'.format(title, (j + 1) / len(pics_info)))
+            if isDownloaded is True:
+                continue
     else:  # try未捕获异常进入else
         isFree = False
     finally:
@@ -93,20 +95,34 @@ def getPicsInfo(url, dire):
 
 # 下载功能
 def download_pics(image_src, i, dire, title):
-    dirPath = 'E:\papapa\ziman\ ' + dire + '\\' + title  # 拼接文件目录路径
+    dirPath = 'D:\spider\ziman\ ' + dire + '\\' + title  # 拼接文件目录路径
     if not os.path.exists(dirPath):  # 如果不存在创建该路径
         os.makedirs(dirPath)  # 创建多层目录makedirs（），创建单层目录mkdir（）
     filename = os.path.basename(str(i) + '.png')
     filepath = os.path.join(dirPath, filename)  # 拼接文件存储路径
-    headers = {
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36',
-        'Referer': 'https://global.toomics.com/sc/age_verification?cancel_return=L3Nj&return_url=L3NjL3dlYnRvb24vZGV0YWlsL2NvZGUvMTMwNjkzL2VwLzEvdG9vbi81Njc5'}
-    request = urllib.request.Request(url=image_src, headers=headers)  # 对该图片发起请求
-    res = urllib.request.urlopen(request)  # 打开图片
-    # res.encoding = 'utf-8'
-    with open(filepath, 'wb') as fp:
-        fp.write(res.read())  # 存储图片
+    isDownloaded = False  # 新增是否已经下载过变量，没有下载过继续下载，下载过不再下载
+    if not os.path.exists(filepath):  # 判断该文件是否已存在
+        isDownloaded = False
+        headers = {
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36',
+            'Referer': 'https://global.toomics.com/sc/age_verification?cancel_return=L3Nj&return_url=L3NjL3dlYnRvb24vZGV0YWlsL2NvZGUvMTMwNjkzL2VwLzEvdG9vbi81Njc5'}
+        request = urllib.request.Request(url=image_src, headers=headers)  # 对该图片发起请求
+        res = urllib.request.urlopen(request)  # 打开图片
+        # res.encoding = 'utf-8'
+        with open(filepath, 'wb') as fp:
+            fp.write(res.read())  # 存储图片
+        return isDownloaded
+
+    else:
+        isDownloaded = True
+        print('{0}文件已存在'.format(filepath))
+        return isDownloaded
+
+
+
+
+
 
 
 
