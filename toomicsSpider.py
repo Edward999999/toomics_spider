@@ -1,5 +1,6 @@
 # coding:utf-8
 import os
+import threading
 import traceback
 import urllib
 from urllib.request import urlretrieve
@@ -8,7 +9,7 @@ from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 
 dri = webdriver.Chrome()
-dri.implicitly_wait(10)
+dri.implicitly_wait(1)
 dri.get('https://global.toomics.com')
 
 
@@ -16,12 +17,13 @@ dri.get('https://global.toomics.com')
 def loginToomics():
     dri.find_element(By.ID, 'toggle-login').click()
     dri.find_element(By.XPATH, "//div[@class='section_sns_sign_wrap01']/button").click()
-    dri.find_element(By.ID, 'user_id').send_keys('fantimeng@gmail.com')
-    dri.find_element(By.ID, 'user_pw').send_keys('ti199058')
+    dri.find_element(By.ID, 'user_id').send_keys('你自己的账号')
+    dri.find_element(By.ID, 'user_pw').send_keys('你自己的密码')
     dri.find_element(By.XPATH, "//fieldset[@id='login_fieldset']/button").click()
     dri.find_element(By.CLASS_NAME, 'section_19plus').click()
-    dri.find_element(By.LINK_TEXT, '分类').click()
     print('登录成功')
+    dri.find_element(By.LINK_TEXT, '分类').click()
+    print('打开分类菜单成功')
 
 
 # 解析网站所有漫画栏目页面，获取漫画地址的href和标题
@@ -71,7 +73,7 @@ def getPicsInfo(url, dire):
         dri.find_element(By.ID, 'charge_btn')
     except Exception:  # try捕获异常执行异常下面的操作,未发现充值按钮才能进行下载操作
         isFree = True
-        print(traceback.print_exc())
+        # print(traceback.print_exc())
         htmlInfo = BeautifulSoup(dri.page_source, 'html.parser')
         # 解析网页
         # 获取网页的title
@@ -80,44 +82,77 @@ def getPicsInfo(url, dire):
         pics_info1 = htmlInfo.find_all('img', class_='img-responsive center-block lazy loaded')  # 已经加载的
         pics_info2 = htmlInfo.find_all('img', class_='img-responsive center-block lazy')  # 未经加载的
         pics_info = pics_info1 + pics_info2  # 图片连接拼合进一个list
-        # 根据List中的图片连接下载图片
-        for j in range(len(pics_info)):
-            img_src = pics_info[j]['src']
-            isDownloaded = download_pics(img_src, j + 1, dire, title)
-            print('{0}下载进度{1:.2%}'.format(title, (j + 1) / len(pics_info)))
-            if isDownloaded is True:
-                continue
+        # 创建下载目录
+        dirPath = 'D:\spider\ziman\ ' + dire + '\\' + title  # 拼接文件目录路径
+        if not os.path.exists(dirPath):  # 如果不存在创建该路径
+            os.makedirs(dirPath)  # 创建多层目录makedirs（），创建单层目录mkdir（）
+
+        new_pics_info = segmentationList(pics_info, 10)  # 把图片截取成，每10个为一个小列表
+        threads = []
+        for i in range(len(new_pics_info)):
+            # 方法只传方法名，参数里面传递参数
+            thread = threading.Thread(target=download_pics, args=(new_pics_info[i], 10 * i, dirPath, title))
+            threads.append(thread)
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
     else:  # try未捕获异常进入else
         isFree = False
     finally:
         return isFree
 
 
-# 下载功能
-def download_pics(image_src, i, dire, title):
-    dirPath = 'D:\spider\ziman\ ' + dire + '\\' + title  # 拼接文件目录路径
-    if not os.path.exists(dirPath):  # 如果不存在创建该路径
-        os.makedirs(dirPath)  # 创建多层目录makedirs（），创建单层目录mkdir（）
-    filename = os.path.basename(str(i) + '.png')
-    filepath = os.path.join(dirPath, filename)  # 拼接文件存储路径
-    isDownloaded = False  # 新增是否已经下载过变量，没有下载过继续下载，下载过不再下载
+# 把列表分割为n份，并返回分割后的列表组合的新列表
+def segmentationList(be_list, n):
+    af_list = []
+    for i in range(0, len(be_list), n):
+        temp = be_list[i:i + n]
+        af_list.append(temp)
+    return af_list
+
+
+# 判断是否已下载
+def isDown(filepath):
     if not os.path.exists(filepath):  # 判断该文件是否已存在
         isDownloaded = False
-        headers = {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36',
-            'Referer': 'https://global.toomics.com/sc/age_verification?cancel_return=L3Nj&return_url=L3NjL3dlYnRvb24vZGV0YWlsL2NvZGUvMTMwNjkzL2VwLzEvdG9vbi81Njc5'}
-        request = urllib.request.Request(url=image_src, headers=headers)  # 对该图片发起请求
-        res = urllib.request.urlopen(request)  # 打开图片
-        # res.encoding = 'utf-8'
-        with open(filepath, 'wb') as fp:
-            fp.write(res.read())  # 存储图片
-        return isDownloaded
-
     else:
         isDownloaded = True
-        print('{0}文件已存在'.format(filepath))
-        return isDownloaded
+    return isDownloaded
+
+
+# 拼接下载路径
+def downPath(p, dir_path):
+    filename = os.path.basename(str(p) + '.png')
+    filepath = os.path.join(dir_path, filename)  # 拼接文件存储路径
+    return filepath
+
+
+# 下载功能
+def download_pics(pics_info, i, dir_path, title):
+    headers = {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36',
+        'Referer': 'https://global.toomics.com/sc/age_verification?cancel_return=L3Nj&return_url=L3NjL3dlYnRvb24vZGV0YWlsL2NvZGUvMTMwNjkzL2VwLzEvdG9vbi81Njc5'}
+    # 根据List中的图片连接下载图片
+    for j in range(len(pics_info)):
+        img_src = pics_info[j]['src']
+        p = j + 1 + i   # 第几张图片
+        filepath = downPath(p, dir_path)
+        if isDown(filepath) is False:
+            request = urllib.request.Request(url=img_src, headers=headers)  # 对该图片发起请求
+            res = urllib.request.urlopen(request)  # 打开图片
+            with open(filepath, 'wb') as fp:
+                fp.write(res.read())  # 存储图片
+            print('{0}正在下载第{1}P'.format(title, p))
+        else:
+            print('{0}第{1}P已下载'.format(title, p))
+            continue
+
+
+
+
 
 
 
