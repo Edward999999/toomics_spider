@@ -20,14 +20,14 @@ import toomicsSpider
 
 # Press the green button in the gutter to run the script.
 def main():
-    toomicsSpider.loginToomics()
-    allComics = toomicsSpider.parseWeb()
+    toomicsSpider.login_toomics()
+    allComics = toomicsSpider.parse_web()
     print(len(allComics))
     for i in range(len(allComics)):
-        picPageUrl = toomicsSpider.getInfoFromDetailPage(allComics[i][0])
+        picPageUrl = toomicsSpider.get_info_from_detail_page(allComics[i][0])
         dire = allComics[i][1]
         for j in range(len(picPageUrl)):
-            isFree = toomicsSpider.getPicsInfo(picPageUrl[j], dire)
+            isFree = toomicsSpider.get_pics_info(picPageUrl[j], dire)
             if isFree is False:
                 break
 
